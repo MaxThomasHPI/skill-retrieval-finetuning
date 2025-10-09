@@ -2,7 +2,7 @@
 
 
 
-# skill-retrieval-eval
+# skill-retrieval-embedder
 
 This repository contains data preparation, training, and evaluation code for skill-to-skill and query-to-skill retrieval experiments built around ESCO and GRETA datasets. The project focuses on building dense retrieval models (embedding-based) and experimenting with hard-negative mining, dataset balancing and Multiple Negatives Ranking losses to improve retrieval quality for skill annotation and recommendation.
 
@@ -22,7 +22,7 @@ High-level flow:
 3. Train a sentence/embedding model using MultipleNegativesRankingLoss with cached in-batch negatives plus curated hard negatives.
 4. Evaluate on held-out `eval_split` with ranking metrics (accuracy@K, precision@K, recall@K, NDCG, MRR, MAP) and measure query latency.
 
-## Data preparation (what we do and where)
+## Data preparation
 
 Notes on the latest training data preparation (isy-finetune-v2):
 
@@ -34,7 +34,7 @@ Notes on the latest training data preparation (isy-finetune-v2):
 - Used `scripts/preperation/create_evaluation_dataset.py` to create an evaluation split of 529 samples covering all ESCO categories.
 - Used `hard_negative_mining.py` to mine hard negatives from the full ESCO skill set using a base encoder (e5-base) adding up to 8 additinal positive aware hard negatives per sample. Hard negatives were filtered to remove possible false negatives (i.e. samples that are too similar to the positive labels).
 
-## Training (strategy and where to run)
+## Training
 
 Primary training entrypoint:
 
@@ -149,3 +149,4 @@ Key takeaways:
 - The v2 finetune (balanced + hard negatives + CachedMNR) substantially improves top-1 and top-5 accuracy and MRR relative to both the base encoder and an earlier finetune.
 
 - Latency per query remains low (~0.10s) and is acceptable for many production use cases. Exact latency will depend on hardware and retrieval index configuration.
+
