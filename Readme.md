@@ -1,8 +1,4 @@
-
-
-
-
-# skill-retrieval-embedder
+# skill-retrieval-finetuning
 
 This repository contains data preparation, training, and evaluation code for skill-to-skill and query-to-skill retrieval experiments built around ESCO and GRETA datasets. The project focuses on building dense retrieval models (embedding-based) and experimenting with hard-negative mining, dataset balancing and Multiple Negatives Ranking losses to improve retrieval quality for skill annotation and recommendation.
 
@@ -149,4 +145,5 @@ Key takeaways:
 - The v2 finetune (balanced + hard negatives + CachedMNR) substantially improves top-1 and top-5 accuracy and MRR relative to both the base encoder and an earlier finetune.
 
 - Latency per query remains low (~0.10s) and is acceptable for many production use cases. Exact latency will depend on hardware and retrieval index configuration.
+
 
