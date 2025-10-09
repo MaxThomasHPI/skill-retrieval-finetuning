@@ -57,17 +57,6 @@ Evaluation is performed on held-out `data/eval_split/*` JSONL files containing 5
 
 Summary of recent evaluation (high level):
 
-<style type="text/css">
-#T_571d6_row0_col1, #T_571d6_row0_col2, #T_571d6_row0_col3, #T_571d6_row0_col4, #T_571d6_row0_col5, #T_571d6_row0_col6, #T_571d6_row0_col7, #T_571d6_row0_col8, #T_571d6_row0_col9, #T_571d6_row0_col10, #T_571d6_row0_col11, #T_571d6_row0_col12, #T_571d6_row0_col13, #T_571d6_row0_col14, #T_571d6_row0_col15, #T_571d6_row1_col16 {
-  background-color: rgb(230,230,230);
-}
-#T_571d6_row0_col16, #T_571d6_row1_col1, #T_571d6_row1_col2, #T_571d6_row1_col3, #T_571d6_row1_col4, #T_571d6_row1_col5, #T_571d6_row1_col6, #T_571d6_row1_col7, #T_571d6_row1_col8, #T_571d6_row1_col9, #T_571d6_row1_col10, #T_571d6_row1_col11, #T_571d6_row1_col12, #T_571d6_row1_col13, #T_571d6_row1_col14, #T_571d6_row1_col15 {
-  background-color: rgb(175,227,145);
-}
-#T_571d6_row2_col1, #T_571d6_row2_col2, #T_571d6_row2_col3, #T_571d6_row2_col4, #T_571d6_row2_col5, #T_571d6_row2_col6, #T_571d6_row2_col7, #T_571d6_row2_col8, #T_571d6_row2_col9, #T_571d6_row2_col10, #T_571d6_row2_col11, #T_571d6_row2_col12, #T_571d6_row2_col13, #T_571d6_row2_col14, #T_571d6_row2_col15, #T_571d6_row2_col16 {
-  background-color: rgb(110, 235, 55);
-}
-</style>
 <table id="T_571d6">
   <thead>
     <tr>
@@ -158,4 +147,5 @@ Summary of recent evaluation (high level):
 Key takeaways:
 
 - The v2 finetune (balanced + hard negatives + CachedMNR) substantially improves top-1 and top-5 accuracy and MRR relative to both the base encoder and an earlier finetune.
+
 - Latency per query remains low (~0.10s) and is acceptable for many production use cases. Exact latency will depend on hardware and retrieval index configuration.
