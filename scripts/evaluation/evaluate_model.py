@@ -84,6 +84,7 @@ def get_esco_category_name(category_code: str) -> str:
 # Global cache for ESCO hierarchy embeddings
 _esco_hierarchy_embeddings = None
 _esco_hierarchy_labels = None
+_esco_hierarchy_model_name = None
 
 
 def get_esco_hierarchy_data():
@@ -124,7 +125,7 @@ def get_esco_hierarchy_data():
 
 
 def categorize_esco_topic_semantic(
-    skill_label: str, model, use_cache: bool = True
+    skill_label: str, model, model_name: str = None, use_cache: bool = True
 ) -> str:
     """
     Categorize ESCO skills using semantic similarity to ESCO hierarchy categories.
@@ -138,20 +139,44 @@ def categorize_esco_topic_semantic(
         ESCO hierarchy category code (e.g., 'T1', 'S5', '06', 'L')
     """
     global _esco_hierarchy_embeddings, _esco_hierarchy_labels
+    global _esco_hierarchy_model_name
 
     # Get hierarchy data
     hierarchy_data = get_esco_hierarchy_data()
 
     # Initialize or use cached embeddings for hierarchy categories
-    if _esco_hierarchy_embeddings is None or not use_cache:
+    # If model_name is provided and different from cached, recompute embeddings
+    if model_name is None:
+        try:
+            model_name = getattr(model, "model_name", None)
+        except Exception:
+            model_name = None
+
+    if (
+        _esco_hierarchy_embeddings is None
+        or not use_cache
+        or (
+            "_esco_hierarchy_model_name" in globals()
+            and _esco_hierarchy_model_name != model_name
+        )
+    ):
         hierarchy_descriptions = list(hierarchy_data.values())
         _esco_hierarchy_labels = list(hierarchy_data.keys())
-        _esco_hierarchy_embeddings = model.encode(
-            hierarchy_descriptions, show_progress_bar=False
-        )
+        # For E5-style models, ESCO categories are passages
+        if model_name and "e5" in model_name.lower():
+            encode_texts = [f"passage: {d}" for d in hierarchy_descriptions]
+        else:
+            encode_texts = hierarchy_descriptions
+        _esco_hierarchy_embeddings = model.encode(encode_texts, show_progress_bar=False)
+        _esco_hierarchy_model_name = model_name
 
-    # Encode the skill label
-    skill_embedding = model.encode([skill_label], show_progress_bar=False)[0]
+    # Encode the skill label (treat as passage for E5 models)
+    if model_name and "e5" in model_name.lower():
+        skill_text = f"passage: {skill_label}"
+    else:
+        skill_text = skill_label
+
+    skill_embedding = model.encode([skill_text], show_progress_bar=False)[0]
 
     # Calculate similarities
     similarities = np.dot(skill_embedding, _esco_hierarchy_embeddings.T)
@@ -278,7 +303,9 @@ def calculate_detailed_metrics(rankings: List[int]) -> Dict:
     }
 
 
-def evaluate_embeddings(model, eval_data: List[Dict], batch_size: int = 32) -> Dict:
+def evaluate_embeddings(
+    model, eval_data: List[Dict], batch_size: int = 32, model_name: str = None
+) -> Dict:
     """
     Enhanced evaluation with detailed performance analysis.
 
@@ -317,9 +344,22 @@ def evaluate_embeddings(model, eval_data: List[Dict], batch_size: int = 32) -> D
     start_time = time.time()
 
     label_embeddings = []
+    # Determine if we should prefix for E5 models
+    if model_name is None:
+        try:
+            model_name = getattr(model, "model_name", None)
+        except Exception:
+            model_name = None
+
+    is_e5 = bool(model_name and "e5" in model_name.lower())
+
     for i in range(0, len(unique_labels), batch_size):
         batch_labels = unique_labels[i : i + batch_size]
-        batch_embeddings = model.encode(batch_labels, show_progress_bar=False)
+        if is_e5:
+            batch_encode_texts = [f"passage: {lbl}" for lbl in batch_labels]
+        else:
+            batch_encode_texts = batch_labels
+        batch_embeddings = model.encode(batch_encode_texts, show_progress_bar=False)
         label_embeddings.append(batch_embeddings)
         if (i // batch_size + 1) % 10 == 0:
             print(
@@ -373,7 +413,9 @@ def evaluate_embeddings(model, eval_data: List[Dict], batch_size: int = 32) -> D
         # Categorize by dominant ESCO topic using semantic similarity
         topic_counts = defaultdict(int)
         for pos_label in positive_labels:
-            topic = categorize_esco_topic_semantic(pos_label, model)
+            topic = categorize_esco_topic_semantic(
+                pos_label, model, model_name=model_name
+            )
             topic_counts[topic] += 1
 
         # Get dominant topic (most frequent)
@@ -382,8 +424,13 @@ def evaluate_embeddings(model, eval_data: List[Dict], batch_size: int = 32) -> D
         else:
             dominant_topic = "Other"
 
-        # Encode query
-        query_embedding = model.encode([query], show_progress_bar=False)[0]
+        # Encode query (with prefix for E5 models)
+        if is_e5:
+            query_text = f"query: {query}"
+        else:
+            query_text = query
+
+        query_embedding = model.encode([query_text], show_progress_bar=False)[0]
 
         # Calculate similarities
         similarities = np.dot(query_embedding, label_embeddings.T)
@@ -407,7 +454,9 @@ def evaluate_embeddings(model, eval_data: List[Dict], batch_size: int = 32) -> D
                         {
                             "label": pos_label,
                             "rank": rank,
-                            "topic": categorize_esco_topic_semantic(pos_label, model),
+                            "topic": categorize_esco_topic_semantic(
+                                pos_label, model, model_name=model_name
+                            ),
                             "similarity": similarities[label_idx],
                         }
                     )
@@ -871,6 +920,12 @@ def main():
         print(f"❌ Error loading model: {e}")
         return 1
 
+    # Attach model_name to model for downstream use if possible
+    try:
+        setattr(model, "model_name", model_name)
+    except Exception:
+        pass
+
     # Load evaluation data
     print(f"📂 Loading evaluation data from: {eval_data_path}")
     eval_data = load_data(eval_data_path)
@@ -878,7 +933,9 @@ def main():
 
     # Run evaluation
     print(f"\\n🚀 Starting evaluation...")
-    metrics = evaluate_embeddings(model, eval_data, args.batch_size)
+    metrics = evaluate_embeddings(
+        model, eval_data, args.batch_size, model_name=model_name
+    )
 
     # Print results
     print_results(metrics, model_name)

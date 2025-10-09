@@ -6,7 +6,6 @@ from langchain_chroma import Chroma
 import chromadb
 from chromadb.config import Settings
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.embeddings import HuggingFaceInstructEmbeddings
 from FlagEmbedding import FlagReranker
 from api_client import APIClient
 from api_config import APIConfig
@@ -63,13 +62,27 @@ class RetrievalEvaluator:
         collection_name = "temp"
         # Initialize the embedding function
         if "instruct" in model_name:
-            embedding_function = HuggingFaceInstructEmbeddings(
+            embedding_function = HuggingFaceEmbeddings(
                 model_name=model_name,
-                query_instruction="Represent the learning outcome for retrieving relevant skills: ",
-                embed_instruction="Represent the skill for retrieval: ",
+                encode_kwargs={
+                    "normalize_embeddings": True,
+                    "prompt": "Represent the skill for retrieval: ",
+                },
+                query_encode_kwargs={
+                    "prompt": "Represent the learning outcome for retrieving relevant skills: ",
+                },
+            )
+        elif "e5" in model_name:
+            embedding_function = HuggingFaceEmbeddings(
+                model_name=model_name,
+                encode_kwargs={"normalize_embeddings": True, "prompt": "passage: "},
+                query_encode_kwargs={"prompt": "query: "},
             )
         else:
-            embedding_function = HuggingFaceEmbeddings(model_name=model_name)
+            embedding_function = HuggingFaceEmbeddings(
+                model_name=model_name,
+                encode_kwargs={"normalize_embeddings": True},
+            )
 
         # Check if the collection exists
         collection = self.db_client.get_or_create_collection(name=collection_name)

@@ -1514,6 +1514,8 @@ def generate_new_skill_samples(
     embedding_cache=None,
     single_positive_label: bool = False,
     max_additional_skills: int = 3,
+    max_negatives_per_sample: int = 2,
+    negative_pool_multiplier: int = 4,
 ) -> List[SyntheticSample]:
     """Generate synthetic samples for completely new skills not present in the dataset.
 
@@ -1657,15 +1659,30 @@ def generate_new_skill_samples(
             )
 
             # Select smart hard negatives that avoid confusion
-            # These are from the SAME occupation but semantically distant
-            negative_skills = find_smart_hard_negatives(
+            # These are from the SAME occupation but semantically distant.
+            # To vary negatives across multiple generated samples for the same
+            # positive label, request a larger candidate pool and then sample
+            # a different subset per generated sample.
+            pool_size = max(10, max_negatives_per_sample * negative_pool_multiplier)
+            candidate_negatives = find_smart_hard_negatives(
                 positive_skills,
                 skill_docs,
                 covered_skills,
-                max_negatives=2,
+                max_negatives=pool_size,
                 model=model,
                 embedding_cache=embedding_cache,
             )
+
+            if candidate_negatives:
+                if len(candidate_negatives) <= max_negatives_per_sample:
+                    negative_skills = list(candidate_negatives)
+                else:
+                    # Pick a different subset for each sample
+                    negative_skills = random.sample(
+                        candidate_negatives, k=max_negatives_per_sample
+                    )
+            else:
+                negative_skills = []
 
             # Build combined context for all positive skills
             combined_description_parts = []
@@ -1970,7 +1987,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--max-negatives",
         type=int,
-        default=8,
+        default=2,
         help="Maximum number of negative labels to include per synthetic sample (default: %(default)s)",
     )
     parser.add_argument(
@@ -2088,31 +2105,31 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "00": 5.0,  # Allgemeine Bildungsprogramme
                 "T5": 4.5,  # Körperliche und manuelle Fähigkeiten
                 "01": 4.0,  # Erziehungswissenschaften
-                "04": 4.0,  # Wirtschaft, Verwaltung
-                "S5": 4.0,  # Arbeiten mit Computern
-                "02": 3.5,  # Kunst und Geisteswissenschaften
-                "10": 3.5,  # Dienstleistungen
-                "T2": 3.5,  # Denkfähigkeiten
+                "04": 3.0,  # Wirtschaft, Verwaltung
+                "S5": 2.0,  # Arbeiten mit Computern
+                "02": 2.5,  # Kunst und Geisteswissenschaften
+                "10": 2.5,  # Dienstleistungen
+                "T2": 4.0,  # Denkfähigkeiten
                 "05": 4.0,  # Naturwissenschaften
                 # Areas with worse performance (medium-high priority)
-                "T6": 3.5,  # Aktive Bürgerschaft - worst performance
-                "S2": 4.0,  # Informationskompetenzen - poor performance
-                "S4": 1.0,  # Managementfähigkeiten - poor performance
+                "T6": 2.5,  # Aktive Bürgerschaft - worst performance
+                "S2": 1.0,  # Informationskompetenzen 
+                "S4": 1.0,  # Managementfähigkeiten
                 # Well-performing areas (lower priority)
-                "L": 1.0,  # Language skills
-                "08": 1.0,  # Agriculture
+                "L": 2.0,  # Language skills
+                "08": 2.0,  # Agriculture
                 "T3": 1.0,  # Self-management
                 "09": 1.0,  # Health services
-                "S7": 2.0,  # Construction
+                "S7": 3.0,  # Construction
                 "S1": 2.0,  # Communication
-                "S3": 2.0,  # Care and support
-                "S6": 2.0,  # Handling/Transport
-                "S8": 2.0,  # Machine operation
-                "T4": 2.0,  # Social/communication skills
-                "03": 2.0,  # Social sciences
+                "S3": 3.0,  # Care and support
+                "S6": 3.0,  # Handling/Transport
+                "S8": 3.0,  # Machine operation
+                "T4": 3.5,  # Social/communication skills
+                "03": 3.0,  # Social sciences
                 "06": 2.0,  # ICT
                 "07": 2.0,  # Engineering
-                "99": 1.0,  # Unknown
+                "99": 2.0,  # Unknown
             }
 
             suggestions = suggest_skills_for_expansion(
@@ -2291,6 +2308,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             embedding_cache=embedding_cache,
             single_positive_label=args.single_positive_label,
             max_additional_skills=args.max_additional_skills,
+            max_negatives_per_sample=args.max_negatives,
         )
 
         # Log final cache statistics
